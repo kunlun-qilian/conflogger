@@ -2,15 +2,17 @@ package conflogger
 
 import (
 	"context"
+	"errors"
+	"github.com/go-courier/logr"
 	"testing"
+	"time"
 
-	"github.com/go-courier/metax"
-	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var logger = Log{
-	Name:   "test",
-	Level:  "Debug",
+	Level:  "DEBUG",
 	Format: "json",
 }
 
@@ -20,11 +22,38 @@ func init() {
 }
 
 func TestLog(t *testing.T) {
-	ctx := metax.ContextWithMeta(context.Background(), metax.Meta{"_id": {"from context"}})
-	ctx = metax.ContextWithMeta(ctx, metax.Meta{"_id": {"from context"}, "operator": {"test@0.0.0"}})
+	ctx := context.Background()
+	doLog(ctx)
 
-	logrus.WithContext(ctx).Info("Info")
-	logrus.WithContext(ctx).Warning("Warn")
-	logrus.WithContext(ctx).Error("Error")
-	logrus.WithContext(ctx).WithField("test2", 2).Info("test")
+}
+
+func doLog(ctx context.Context) {
+	tracer := otel.Tracer("")
+
+	ctx, span := tracer.Start(ctx, "op", trace.WithTimestamp(time.Now()))
+	defer func() {
+		span.End(trace.WithTimestamp(time.Now()))
+	}()
+
+	ctx = logr.WithLogger(ctx, SpanLogger(span))
+
+	someActionWithSpan(ctx)
+
+	otherActions(ctx)
+}
+
+func someActionWithSpan(ctx context.Context) {
+	_, log := logr.Start(ctx, "SomeActionWithSpan")
+	defer log.End()
+
+	log.Info("info")
+	log.Debug("debug")
+	log.Warn(errors.New("warn"))
+}
+
+func otherActions(ctx context.Context) {
+	log := logr.FromContext(ctx)
+
+	log.WithValues("test2", 2).Info("test")
+	log.Error(errors.New(""))
 }

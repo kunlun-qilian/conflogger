@@ -1,6 +1,7 @@
 package conflogger
 
 import (
+	"github.com/go-courier/logr"
 	"github.com/sirupsen/logrus"
 	"os"
 	"runtime"
@@ -8,58 +9,67 @@ import (
 	"strings"
 )
 
+var l = logr.DebugLevel
+
+func SetLevel(lvl logr.Level) {
+	l = lvl
+}
+
 type Log struct {
 	ReportCaller bool
-	Name         string
-	Level        string `env:""`
-	Format       string
+	Level        string     `env:""`
+	Output       OutputType `env:""`
+	Format       FormatType
 	init         bool
 }
 
-func (log *Log) SetDefaults() {
-	log.ReportCaller = true
+func (l *Log) SetDefaults() {
 
-	if log.Level == "" {
-		log.Level = "DEBUG"
+	if l.Output == "" {
+		l.Output = OutputAlways
 	}
 
-	if log.Format == "" {
-		log.Format = "json"
-	}
-}
-
-func (log *Log) Init() {
-	if !log.init {
-		log.Create()
-		log.init = true
+	if l.Format == "" {
+		l.Format = FormatJSON
 	}
 }
 
-func (log *Log) Create() {
-	log.SetDefaults()
-	if log.Format == "json" {
-		logrus.SetFormatter(&logrus.JSONFormatter{
-			//PrettyPrint:      true,
-			CallerPrettyfier: CallerPrettyfier,
-		})
-	} else {
-		logrus.SetFormatter(&logrus.TextFormatter{
-			ForceColors:      true,
-			CallerPrettyfier: CallerPrettyfier,
-		})
-	}
+func (l *Log) Init() {
+	if !l.init {
+		if l.Format == "json" {
+			logrus.SetFormatter(&logrus.JSONFormatter{
+				CallerPrettyfier: CallerPrettyfier,
+			})
+		} else {
+			logrus.SetFormatter(&logrus.TextFormatter{
+				ForceColors:      true,
+				CallerPrettyfier: CallerPrettyfier,
+			})
+		}
 
-	logrus.SetLevel(getLogLevel(log.Level))
-	logrus.SetReportCaller(log.ReportCaller)
-	logrus.SetOutput(os.Stdout)
+		logursLevel, logrLevel := getLogLevel(l.Level)
+		SetLevel(logrLevel)
+		logrus.SetLevel(logursLevel)
+		logrus.SetReportCaller(l.ReportCaller)
+		logrus.SetOutput(os.Stdout)
+
+		if err := InstallNewPipeline(l.Output, l.Format); err != nil {
+			panic(err)
+		}
+		l.init = true
+	}
 }
 
-func getLogLevel(l string) logrus.Level {
+func getLogLevel(l string) (logrus.Level, logr.Level) {
 	level, err := logrus.ParseLevel(strings.ToLower(l))
-	if err == nil {
-		return level
+	if err != nil {
+		return logrus.DebugLevel, logr.DebugLevel
 	}
-	return logrus.InfoLevel
+	logrLevel, logrLevelErr := logr.ParseLevel(l)
+	if logrLevelErr != nil {
+		return logrus.DebugLevel, logr.DebugLevel
+	}
+	return level, logrLevel
 }
 
 func CallerPrettyfier(f *runtime.Frame) (function string, file string) {
