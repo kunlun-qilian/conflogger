@@ -82,9 +82,9 @@ func (e *spanMapExporter) ExportSpans(ctx context.Context, spanData []sdktrace.R
 
 func StdoutSpanExporter(formatType FormatType) sdktrace.SpanExporter {
 	if formatType == FormatJSON {
-		return &stdoutSpanExporter{formatter: slog.NewJSONHandler(os.Stdout)}
+		return &stdoutSpanExporter{formatter: slog.NewJSONHandler(os.Stdout, nil)}
 	}
-	return &stdoutSpanExporter{formatter: slog.NewTextHandler(os.Stdout)}
+	return &stdoutSpanExporter{formatter: slog.NewTextHandler(os.Stdout, nil)}
 }
 
 type stdoutSpanExporter struct {
