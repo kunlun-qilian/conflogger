@@ -1,6 +1,6 @@
 module github.com/kunlun-qilian/conflogger
 
-go 1.20
+go 1.23
 
 require (
 	github.com/go-courier/logr v0.3.0
